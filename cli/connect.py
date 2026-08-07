@@ -11,6 +11,7 @@ import hashlib
 import hmac
 import json
 import tomllib
+from urllib.parse import urlsplit
 
 from rich.console import Console
 
@@ -23,6 +24,22 @@ from core.config import (
 )
 
 console = Console(soft_wrap=True, highlight=False)  # keep URLs copy-pastable
+
+
+def _http_url(value: str, label: str) -> str:
+    url = value.strip()
+    try:
+        parsed = urlsplit(url)
+        _ = parsed.port  # force validation of malformed ports
+    except ValueError as exc:
+        raise SystemExit(f"{label} must be a valid http(s) URL, got {value!r}") from exc
+    if (
+        parsed.scheme not in {"http", "https"}
+        or not parsed.hostname
+        or any(char.isspace() for char in url)
+    ):
+        raise SystemExit(f"{label} must be a valid http(s) URL, got {value!r}")
+    return url
 
 
 def _update_config(mutate) -> dict:
@@ -75,8 +92,7 @@ def connect_webhook(url: str, secret: str | None = None, max_level: str = "ring"
     """Outbound: register a delivery-webhook receiver (protocol, not pipes — §4.5)."""
     from delivery.base import LEVELS
 
-    if not url.startswith(("http://", "https://")):
-        raise SystemExit(f"receiver url must be http(s), got {url!r}")
+    url = _http_url(url, "receiver url")
     if max_level not in LEVELS:
         raise SystemExit(f"max_level must be one of {'/'.join(LEVELS)}")
 

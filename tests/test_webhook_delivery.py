@@ -246,6 +246,14 @@ def test_connect_webhook_rejects_a_bad_url_and_level(tmp_path, monkeypatch):
     bad_url = runner.invoke(app, ["connect", "webhook", "--url", "ftp://nope"])
     assert bad_url.exit_code != 0
 
+    missing_host = runner.invoke(app, ["connect", "webhook", "--url", "https://"])
+    assert missing_host.exit_code != 0
+
+    whitespace = runner.invoke(
+        app, ["connect", "webhook", "--url", "https://receiver .local/hook"]
+    )
+    assert whitespace.exit_code != 0
+
     bad_level = runner.invoke(app, [
         "connect", "webhook", "--url", "https://r.local/h", "--max-level", "shout",
     ])
