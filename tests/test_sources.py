@@ -79,6 +79,17 @@ async def test_rss_converter_produces_well_formed_events():
     assert event.topic == "news.rss"
 
 
+def test_rss_converter_skips_empty_items_and_keeps_link_only_items():
+    xml = """<rss><channel><title>Status</title>
+      <item></item>
+      <item><link>https://status.example/incidents/1</link></item>
+    </channel></rss>"""
+    payloads = rss_to_payloads(xml)
+    assert len(payloads) == 1
+    assert payloads[0]["summary"] == "Status: https://status.example/incidents/1"
+    assert payloads[0]["dedup_key"] == "https://status.example/incidents/1"
+
+
 def test_converters_contain_no_judgment():
     """Sources only fetch/convert (SPEC §4.1); no scores, no routes."""
     for payload in github_to_payloads(json.loads(GH_FIXTURE)) + rss_to_payloads(RSS_FIXTURE):

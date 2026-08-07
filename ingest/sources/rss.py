@@ -26,11 +26,14 @@ def rss_to_payloads(xml_text: str) -> list[dict]:
             link_el = item.find(f"{_ATOM}link")
             link = link_el.get("href", "") if link_el is not None else ""
         guid = (item.findtext("guid") or item.findtext(f"{_ATOM}id") or link or title).strip()
+        headline = title or link or guid
+        if not headline:
+            continue
         payloads.append(
             {
                 "source": "rss",
                 "topic": "news.rss",
-                "summary": f"{feed_title}: {title}"[:200],
+                "summary": f"{feed_title}: {headline}"[:200],
                 "evidence": [link] if link else [],
                 "dedup_key": guid,
             }
