@@ -20,10 +20,11 @@ Composio *inbound* connector, so one verify function covers both directions.
 Signing happens only when a secret is configured — but configure one: an
 unsigned receiver can't tell Chief from anyone who found its URL.
 
-Delivery is retried (the actor task is already off the hot path), then raised —
-deliver() falls back to the next channel in the chain (degraded loudness beats
-a silent loss), and only if every channel fails does the loss surface in the
-log. There is still no outbound queue; that honest limit is documented.
+Transient delivery failures are retried (the actor task is already off the hot
+path), then raised — deliver() falls back to the next channel in the chain
+(degraded loudness beats a silent loss), and only if every channel fails does
+the loss surface in the log. Permanent 4xx responses fail immediately. There
+is still no outbound queue; that honest limit is documented.
 """
 
 import asyncio
@@ -42,6 +43,7 @@ logger = logging.getLogger(__name__)
 
 ATTEMPTS = 3
 BACKOFF_SECONDS = 0.5  # 0.5s, 1s between the three attempts
+RETRYABLE_CLIENT_STATUSES = {408, 429}
 
 
 def sign(secret: str, event_id: str, timestamp: str, body: bytes) -> str:
@@ -50,6 +52,13 @@ def sign(secret: str, event_id: str, timestamp: str, body: bytes) -> str:
         secret.encode(), f"{event_id}.{timestamp}.".encode() + body, hashlib.sha256
     ).digest()
     return f"v1,{base64.b64encode(mac).decode()}"
+
+
+def _is_retryable(exc: httpx.HTTPError) -> bool:
+    if not isinstance(exc, httpx.HTTPStatusError):
+        return True
+    status = exc.response.status_code
+    return status >= 500 or status in RETRYABLE_CLIENT_STATUSES
 
 
 class WebhookChannel:
@@ -94,7 +103,7 @@ class WebhookChannel:
                     resp.raise_for_status()
                     return
                 except httpx.HTTPError as exc:
-                    if attempt == ATTEMPTS:
+                    if not _is_retryable(exc) or attempt == ATTEMPTS:
                         raise  # brain._act_safely logs it; the loss is not silent
                     logger.warning(
                         "webhook delivery attempt %d/%d failed (%s); retrying",

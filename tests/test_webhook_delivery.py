@@ -130,6 +130,46 @@ async def test_a_dead_receiver_raises_after_retries(monkeypatch):
         await ch.send(msg(), level="ring")
 
 
+async def test_a_permanent_client_error_is_not_retried(monkeypatch):
+    import pytest
+
+    import delivery.webhook as wh
+
+    monkeypatch.setattr(wh, "BACKOFF_SECONDS", 0)
+    attempts = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        attempts.append(1)
+        return httpx.Response(401)
+
+    ch = WebhookChannel(
+        url="https://receiver.local/hook",
+        transport=httpx.MockTransport(handler),
+    )
+    with pytest.raises(httpx.HTTPStatusError):
+        await ch.send(msg(), level="ring")
+    assert len(attempts) == 1
+
+
+async def test_rate_limit_response_is_retried(monkeypatch):
+    import delivery.webhook as wh
+
+    monkeypatch.setattr(wh, "BACKOFF_SECONDS", 0)
+    statuses = iter([429, 200])
+    attempts = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        attempts.append(1)
+        return httpx.Response(next(statuses))
+
+    ch = WebhookChannel(
+        url="https://receiver.local/hook",
+        transport=httpx.MockTransport(handler),
+    )
+    await ch.send(msg(), level="ring")
+    assert len(attempts) == 2
+
+
 # --- wiring: config → channel, connect → config ---
 
 
