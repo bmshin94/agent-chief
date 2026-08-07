@@ -43,6 +43,7 @@ logger = logging.getLogger(__name__)
 
 ATTEMPTS = 3
 BACKOFF_SECONDS = 0.5  # 0.5s, 1s between the three attempts
+MAX_RETRY_DELAY_SECONDS = 60.0
 RETRYABLE_CLIENT_STATUSES = {408, 429}
 
 
@@ -59,6 +60,14 @@ def _is_retryable(exc: httpx.HTTPError) -> bool:
         return True
     status = exc.response.status_code
     return status >= 500 or status in RETRYABLE_CLIENT_STATUSES
+
+
+def _retry_delay(exc: httpx.HTTPError, attempt: int) -> float:
+    if isinstance(exc, httpx.HTTPStatusError):
+        retry_after = exc.response.headers.get("retry-after", "")
+        if retry_after.isdigit():
+            return min(float(retry_after), MAX_RETRY_DELAY_SECONDS)
+    return BACKOFF_SECONDS * attempt
 
 
 class WebhookChannel:
@@ -109,4 +118,4 @@ class WebhookChannel:
                         "webhook delivery attempt %d/%d failed (%s); retrying",
                         attempt, ATTEMPTS, exc,
                     )
-                    await asyncio.sleep(BACKOFF_SECONDS * attempt)
+                    await asyncio.sleep(_retry_delay(exc, attempt))

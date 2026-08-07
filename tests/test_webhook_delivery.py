@@ -170,6 +170,30 @@ async def test_rate_limit_response_is_retried(monkeypatch):
     assert len(attempts) == 2
 
 
+async def test_retry_after_controls_the_retry_delay(monkeypatch):
+    import delivery.webhook as wh
+
+    delays = []
+
+    async def capture_sleep(delay):
+        delays.append(delay)
+
+    monkeypatch.setattr(wh.asyncio, "sleep", capture_sleep)
+    statuses = iter([429, 200])
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        status = next(statuses)
+        headers = {"Retry-After": "7"} if status == 429 else {}
+        return httpx.Response(status, headers=headers)
+
+    ch = WebhookChannel(
+        url="https://receiver.local/hook",
+        transport=httpx.MockTransport(handler),
+    )
+    await ch.send(msg(), level="ring")
+    assert delays == [7.0]
+
+
 # --- wiring: config → channel, connect → config ---
 
 
