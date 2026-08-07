@@ -51,6 +51,16 @@ def test_connect_rss_and_github(tmp_path, monkeypatch):
     assert config_at(tmp_path)["ingest"]["github"] is True
 
 
+def test_connect_rss_rejects_invalid_feed_urls(tmp_path, monkeypatch):
+    monkeypatch.setenv("CHIEF_HOME", str(tmp_path))
+    from cli.main import app
+
+    for url in ("file:///etc/passwd", "https://", "https://bad host/feed"):
+        result = runner.invoke(app, ["connect", "rss", "--url", url])
+        assert result.exit_code != 0
+    assert not (tmp_path / "config.toml").exists()
+
+
 def test_connect_preserves_existing_config(tmp_path, monkeypatch):
     monkeypatch.setenv("CHIEF_HOME", str(tmp_path))
     (tmp_path / "config.toml").write_text(

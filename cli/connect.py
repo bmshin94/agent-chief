@@ -138,6 +138,8 @@ def connect_github() -> None:
 
 
 def connect_rss(url: str) -> None:
+    url = _http_url(url, "feed url")
+
     def mutate(cfg):
         urls = cfg.setdefault("ingest", {}).setdefault("rss_urls", [])
         if url not in urls:
