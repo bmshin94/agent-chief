@@ -179,6 +179,7 @@ chief connect webhook --url https://your-receiver/hook --secret <random>
 ```
 POST <your url>
 content-type: application/json
+chief-event-id: evt_20260721_1512_ab3f    (stable across retries; use for dedup)
 chief-timestamp: <unix seconds>            (only when a secret is set)
 chief-signature: v1,<base64 hmac>          (only when a secret is set)
 
@@ -220,5 +221,7 @@ anyone who found its URL — set one.
   silent loss. The webhook itself is retried 3× with backoff first. Only when
   *every* channel fails is the event logged and lost — there is no outbound
   queue, so a receiver that must not miss events should be highly available.
+- Retries keep the same `chief-event-id`; receivers should use it as their
+  idempotency key so a timed-out response cannot create duplicate work.
 - Feedback flows back through the normal surface: your receiver can POST
   `/v1/feedback` with `{"event_id", "signal"}` (see §2b) to close the loop.

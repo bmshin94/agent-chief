@@ -53,6 +53,7 @@ async def test_send_posts_the_documented_json_shape():
     assert body["plan"] == "Recommend MU5137 19:05."
     assert body["level"] == "vibrate"  # receiver picks the noise from this
     assert "sent_at" in body
+    assert calls[0].headers["chief-event-id"] == "evt_x"
 
 
 async def test_signature_verifies_with_the_inbound_verifier():

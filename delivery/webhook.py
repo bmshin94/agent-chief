@@ -11,6 +11,7 @@ same personal-delivery posture as the Telegram channel.
 The receiver contract (documented in docs/protocol.md §4):
 
     POST <your url>
+    chief-event-id: <stable delivery id>
     chief-timestamp: <unix seconds>
     chief-signature: v1,<base64 HMAC-SHA256 over "{event_id}.{timestamp}." + body>
     {"event_id", "topic", "summary", "plan", "level", "sent_at"}
@@ -99,7 +100,10 @@ class WebhookChannel:
             "sent_at": time.time(),
         }
         body = json.dumps(payload).encode()
-        headers = {"content-type": "application/json"}
+        headers = {
+            "content-type": "application/json",
+            "chief-event-id": msg.event_id,
+        }
         if self.secret:
             timestamp = str(int(payload["sent_at"]))
             headers["chief-timestamp"] = timestamp
