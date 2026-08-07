@@ -161,10 +161,11 @@ def create_app(
     @app.put("/api/policy")
     async def put_policy(payload: dict, _: None = Depends(check_auth)) -> dict:
         text = payload.get("text")
-        if text is None:
-            raise HTTPException(status_code=422, detail="need text")
-        brain.policy_path.parent.mkdir(parents=True, exist_ok=True)
-        brain.policy_path.write_text(text, encoding="utf-8")
+        if not isinstance(text, str):
+            raise HTTPException(status_code=422, detail="text must be a string")
+        from core.config import write_private_text
+
+        write_private_text(brain.policy_path, text)
         return {"ok": True}  # brain reloads POLICY.md per decision — live now
 
     @app.get("/api/tasks")

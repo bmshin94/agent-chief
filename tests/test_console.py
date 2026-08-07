@@ -6,6 +6,8 @@
 - the console page ships in the wheel and serves as HTML.
 """
 
+import stat
+
 import httpx
 import pytest
 
@@ -70,14 +72,22 @@ async def test_decisions_history_with_search(console):
 
 
 async def test_policy_roundtrip_takes_effect_next_decision(console):
-    c, brain, *_ = console
+    c, brain, _, tmp_path = console
     resp = await c.put("/api/policy", headers=AUTH,
                        json={"text": "## Muted topics\n- spam.deals\n"})
     assert resp.status_code == 200
     assert "spam.deals" in (await c.get("/api/policy", headers=AUTH)).json()["text"]
+    assert stat.S_IMODE((tmp_path / "POLICY.md").stat().st_mode) == 0o600
     decision = await brain.process(
         {"source": "shop", "topic": "spam.deals", "summary": "Huge discount now"})
     assert decision.route == "drop"  # the edit is live immediately
+
+
+async def test_policy_update_rejects_non_string_content(console):
+    c, _, _, tmp_path = console
+    resp = await c.put("/api/policy", headers=AUTH, json={"text": ["not", "text"]})
+    assert resp.status_code == 422
+    assert not (tmp_path / "POLICY.md").exists()
 
 
 async def test_task_approve_and_reject(console):
