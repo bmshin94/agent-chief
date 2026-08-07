@@ -32,8 +32,15 @@ def test_push_payload_drops_absent_optionals_and_carries_present_ones():
 
 
 def test_push_payload_clamps_an_over_long_summary():
-    p = push_payload("x" * 500)
+    original = "x" * 500
+    p = push_payload(original)
     assert len(p["summary"]) == 200  # would 422 against Event.summary otherwise
+    assert p["detail"] == original  # compact display without losing source text
+
+
+def test_push_payload_keeps_explicit_detail_when_summary_is_long():
+    p = push_payload("x" * 500, detail="structured incident context")
+    assert p["detail"] == "structured incident context"
 
 
 def test_push_payload_collapses_a_multiline_summary_to_one_line():

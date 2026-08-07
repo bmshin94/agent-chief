@@ -53,7 +53,8 @@ def push_payload(
     on") and clamped to the schema limit so a long push degrades to a truncated
     event, never a validation error.
     """
-    line = " ".join(summary.split())[:SUMMARY_MAX]
+    normalized = " ".join(summary.split())
+    line = normalized[:SUMMARY_MAX]
     if not line:
         raise ValueError("summary is empty — push needs one line a human could act on")
     if claimed_urgency is not None and claimed_urgency not in URGENCIES:
@@ -65,6 +66,8 @@ def push_payload(
         payload["claimed_urgency"] = claimed_urgency
     if detail:
         payload["detail"] = detail
+    elif len(normalized) > SUMMARY_MAX:
+        payload["detail"] = summary
     if suggested_action:
         payload["suggested_action"] = suggested_action
     return payload
