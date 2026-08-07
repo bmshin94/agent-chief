@@ -6,6 +6,30 @@ All notable changes to Chief are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.9.0] — 2026-08-07
+
+### Added
+- **Receiver-aware webhook delivery**: Chief now honors numeric `Retry-After`
+  hints (capped at 60 seconds) and sends a stable `chief-event-id` header so
+  receivers can deduplicate retries safely.
+- **Lossless long pushes**: summaries still stay within the 200-character
+  decision surface, while the original text is retained in `detail`.
+
+### Fixed
+- Permanent webhook client errors now fail immediately instead of making three
+  doomed attempts; transient network errors, 408/429 responses, and 5xx
+  responses still retry and fall back through the delivery chain.
+- `chief connect webhook` and `chief connect rss` reject malformed or unsafe
+  non-HTTP URLs before they can poison the runtime configuration.
+- Telegram feedback callbacks no longer exceed Telegram's 64-byte limit when
+  topics are long. New compact callbacks resolve the topic from the stored
+  event, while buttons sent by older versions remain compatible.
+- Built-in pollers retry on the next tick after a transient fetch failure
+  instead of waiting a full source interval.
+- RSS drops empty entries, GitHub notifications without complete identifiers
+  receive stable collision-resistant dedup keys, and console policy updates
+  validate their input and use atomic private-file writes.
+
 ## [0.8.0] — 2026-07-22
 
 ### Added
@@ -283,6 +307,7 @@ Initial release: the full SPEC v3 implementation (Steps 1–24).
 - Fully offline deterministic demo (`uvx agent-chief demo`) with a
   full-table routing regression.
 
+[0.9.0]: https://github.com/SmileLikeYe/agent-chief/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/SmileLikeYe/agent-chief/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/SmileLikeYe/agent-chief/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/SmileLikeYe/agent-chief/compare/v0.5.0...v0.6.0
