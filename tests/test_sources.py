@@ -65,6 +65,24 @@ async def test_github_converter_produces_well_formed_events():
     assert event.evidence
 
 
+def test_github_converter_uses_stable_fallback_dedup_keys():
+    notifications = [
+        {
+            "repository": {"full_name": "acme/widgets"},
+            "subject": {"title": "First", "type": "Issue", "url": "https://api/x/1"},
+        },
+        {
+            "repository": {"full_name": "acme/widgets"},
+            "subject": {"title": "Second", "type": "Issue", "url": "https://api/x/2"},
+        },
+    ]
+    first = github_to_payloads(notifications)
+    again = github_to_payloads(notifications)
+    assert first[0]["dedup_key"].startswith("gh-fallback-")
+    assert first[0]["dedup_key"] != first[1]["dedup_key"]
+    assert [p["dedup_key"] for p in first] == [p["dedup_key"] for p in again]
+
+
 async def test_rss_converter_produces_well_formed_events():
     payloads = rss_to_payloads(RSS_FIXTURE)
     assert len(payloads) == 2

@@ -1,6 +1,7 @@
 """Implements SPEC §4.1: github_notifications source — `gh api notifications`,
 poll every 5 min, pure fetch→Event conversion."""
 
+import hashlib
 import json
 from typing import Any
 
@@ -16,6 +17,16 @@ def github_to_payloads(notifications: list[dict[str, Any]]) -> list[dict]:
         repo = n.get("repository", {}).get("full_name", "unknown/repo")
         subject = n.get("subject", {})
         kind = (subject.get("type") or "notification").lower()
+        notification_id = n.get("id")
+        updated_at = n.get("updated_at")
+        if notification_id and updated_at:
+            dedup_key = f"gh-{notification_id}-{updated_at}"
+        else:
+            identity = notification_id or subject.get("url") or (
+                f"{repo}:{kind}:{subject.get('title', '(no title)')}"
+            )
+            digest = hashlib.sha256(f"{identity}|{updated_at or ''}".encode()).hexdigest()[:16]
+            dedup_key = f"gh-fallback-{digest}"
         payloads.append(
             {
                 "source": "github-notifications",
@@ -23,7 +34,7 @@ def github_to_payloads(notifications: list[dict[str, Any]]) -> list[dict]:
                 "summary": f"{repo}: {subject.get('title', '(no title)')}"[:200],
                 "detail": f"reason: {n.get('reason', 'unknown')}",
                 "evidence": [subject["url"]] if subject.get("url") else [],
-                "dedup_key": f"gh-{n.get('id')}-{n.get('updated_at')}",
+                "dedup_key": dedup_key,
             }
         )
     return payloads
