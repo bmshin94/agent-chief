@@ -59,9 +59,10 @@ async def test_inline_buttons_carry_feedback_callbacks():
         "Do it", "Later", "Mute this kind", "👍 Worth it", "👎 Not worth it"
     ]
     datas = [b["callback_data"] for b in keyboard]
-    assert datas[0] == "fb|acted|evt_x|travel.flight_change"
-    assert datas[1] == "fb|read|evt_x|travel.flight_change"
-    assert datas[2] == "fb|muted|evt_x|travel.flight_change"
+    assert datas[0] == "fb|acted|evt_x"
+    assert datas[1] == "fb|read|evt_x"
+    assert datas[2] == "fb|muted|evt_x"
+    assert all(len(data.encode()) <= 64 for data in datas)
 
 
 async def test_button_callback_writes_feedback_row(tmp_path):
@@ -74,12 +75,32 @@ async def test_button_callback_writes_feedback_row(tmp_path):
 
 
 async def test_mute_button_updates_policy_immediately(tmp_path):
+    from datetime import UTC, datetime
+
+    from core.schema import Event
+
     policy_path = tmp_path / "POLICY.md"
     async with State.open(tmp_path / "s.db") as state:
-        await handle_callback("fb|muted|evt_x|marketing.webinar", state, policy_path=policy_path)
+        await state.save_event(Event(
+            id="evt_x",
+            source="test",
+            topic="marketing.webinar",
+            summary="webinar",
+            received_at=datetime(2026, 8, 7, tzinfo=UTC),
+        ))
+        await handle_callback("fb|muted|evt_x", state, policy_path=policy_path)
         rows = await state.feedback_rows()
         assert rows[0]["signal"] == "muted"
     assert load_policy(policy_path).is_muted("marketing.webinar")
+
+
+async def test_legacy_callback_with_topic_still_works(tmp_path):
+    policy_path = tmp_path / "POLICY.md"
+    async with State.open(tmp_path / "s.db") as state:
+        await handle_callback(
+            "fb|muted|old_evt|marketing.legacy", state, policy_path=policy_path
+        )
+    assert load_policy(policy_path).is_muted("marketing.legacy")
 
 
 async def test_malformed_callback_ignored(tmp_path):

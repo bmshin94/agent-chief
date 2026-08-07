@@ -43,7 +43,7 @@ class TelegramChannel:
 
     async def send(self, msg: DeliveryMessage, level: str) -> None:
         keyboard = [
-            {"text": label, "callback_data": f"fb|{signal}|{msg.event_id}|{msg.topic}"}
+            {"text": label, "callback_data": f"fb|{signal}|{msg.event_id}"}
             for label, signal in BUTTONS
         ]
         payload = {
@@ -175,12 +175,17 @@ class TelegramChannel:
 
 
 async def handle_callback(data: str, state: State, policy_path: str | Path) -> None:
-    """`fb|{signal}|{event_id}|{topic}` → feedback row (+ POLICY.md mute)."""
+    """Compact callback → feedback row (+ POLICY.md mute from the stored event)."""
     parts = data.split("|")
-    if len(parts) != 4 or parts[0] != "fb":
+    if len(parts) == 3 and parts[0] == "fb":
+        _, signal, event_id = parts
+        topic = None
+    elif len(parts) == 4 and parts[0] == "fb":
+        # Backward compatibility for buttons sent before the compact format.
+        _, signal, event_id, topic = parts
+    else:
         logger.warning("ignoring malformed callback data: %r", data)
         return
-    _, signal, event_id, topic = parts
     from core.learner import apply_feedback
 
     try:
@@ -189,4 +194,10 @@ async def handle_callback(data: str, state: State, policy_path: str | Path) -> N
         logger.warning("ignoring unknown feedback signal: %r", signal)
         return
     if signal == "muted":
+        if topic is None:
+            event = await state.load_event(event_id)
+            topic = event.topic if event else None
+        if not topic:
+            logger.warning("cannot mute topic for missing event: %s", event_id)
+            return
         add_muted_topic(policy_path, topic)  # Principle 3: effective immediately
