@@ -131,3 +131,23 @@ async def test_poller_survives_fetch_errors():
     poller = Poller(fetch=fetch, submit=submit, interval_minutes=5)
     await poller.tick(NOW)  # must not raise
     await poller.tick(NOW + timedelta(minutes=5))
+
+
+async def test_poller_retries_a_failed_fetch_on_the_next_tick():
+    attempts = []
+    submitted = []
+
+    async def fetch():
+        attempts.append(1)
+        if len(attempts) == 1:
+            raise RuntimeError("temporary outage")
+        return [{"summary": "recovered"}]
+
+    async def submit(payload):
+        submitted.append(payload["summary"])
+
+    poller = Poller(fetch=fetch, submit=submit, interval_minutes=30)
+    await poller.tick(NOW)
+    await poller.tick(NOW + timedelta(seconds=30))
+    assert len(attempts) == 2
+    assert submitted == ["recovered"]

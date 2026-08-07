@@ -29,12 +29,12 @@ class Poller:
     async def tick(self, now: datetime) -> None:
         if self._last_fetch and now - self._last_fetch < self.interval:
             return
-        self._last_fetch = now
         try:
             payloads = await self.fetch()
         except Exception as exc:
             logger.warning("%s fetch failed: %s", self.name, exc)
             return
+        self._last_fetch = now
         for payload in payloads:
             try:
                 await self.submit(payload)
